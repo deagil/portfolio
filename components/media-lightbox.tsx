@@ -121,6 +121,10 @@ export function MediaLightbox({
   const [expanded, setExpanded] = useState(false)
   const [chromeVisible, setChromeVisible] = useState(false)
   const [box, setBox] = useState<Box | null>(null)
+  /** Expanded layout used by chrome/caption so they do not track the reverse morph. */
+  const [chromeBox, setChromeBox] = useState<Box | null>(null)
+  /** Caption/actions freeze on close so setActive for morph does not jump the copy. */
+  const [chromeSlide, setChromeSlide] = useState(initialIndex)
   const [animating, setAnimating] = useState(false)
 
   const closingRef = useRef(false)
@@ -150,6 +154,7 @@ export function MediaLightbox({
         setExpanded(false)
         setChromeVisible(false)
         setBox(null)
+        setChromeBox(null)
         setAnimating(false)
         onClose()
         if (pendingHref) router.push(pendingHref)
@@ -174,7 +179,7 @@ export function MediaLightbox({
       return
     }
 
-    // Morph back immediately while chrome fades in parallel.
+    // Morph back immediately while chrome fades in place (chromeBox stays expanded).
     setExpanded(false)
     setBox(toBox(latest, THUMB_RADIUS))
     clearMorphTimer()
@@ -188,24 +193,29 @@ export function MediaLightbox({
     openOriginRef.current = origin
     originIndexRef.current = initialIndex
     setActive(initialIndex)
+    setChromeSlide(initialIndex)
     setPresent(true)
     setExpanded(false)
     setChromeVisible(false)
     setBox(toBox(origin, THUMB_RADIUS))
+    setChromeBox(null)
     setAnimating(true)
 
     const reduced = prefersReducedMotion()
 
     const frame = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        const expandedBox = getExpandedBox()
         if (reduced) {
-          setBox(getExpandedBox())
+          setBox(expandedBox)
+          setChromeBox(expandedBox)
           setExpanded(true)
           setChromeVisible(true)
           setAnimating(false)
           return
         }
-        setBox(getExpandedBox())
+        setBox(expandedBox)
+        setChromeBox(expandedBox)
         setExpanded(true)
         clearMorphTimer()
         morphTimerRef.current = window.setTimeout(() => {
@@ -228,7 +238,9 @@ export function MediaLightbox({
 
     const onResize = () => {
       if (closingRef.current || !expanded) return
-      setBox(getExpandedBox())
+      const next = getExpandedBox()
+      setBox(next)
+      setChromeBox(next)
     }
     window.addEventListener("resize", onResize)
 
@@ -237,6 +249,11 @@ export function MediaLightbox({
       window.removeEventListener("resize", onResize)
     }
   }, [present, expanded])
+
+  useEffect(() => {
+    if (closingRef.current) return
+    setChromeSlide(active)
+  }, [active])
 
   const goPrev = useCallback(() => {
     if (images.length <= 1 || animating) return
@@ -285,11 +302,13 @@ export function MediaLightbox({
   if (!mounted || !present || images.length === 0 || !box) return null
 
   const current = images[active] ?? images[0]
+  const chromeCurrent = images[chromeSlide] ?? current
+  const layout = chromeBox ?? box
   const reducedMotion = prefersReducedMotion()
   const topBarPad = isDesktopViewport() ? 24 : 12
   const topBarTop = topBarPad
-  const actionHref = current.href ?? detailHref
-  const actionLabel = current.linkLabel ?? detailLabel
+  const actionHref = chromeCurrent.href ?? detailHref
+  const actionLabel = chromeCurrent.linkLabel ?? detailLabel
   const actionExternal = Boolean(actionHref?.startsWith("http"))
 
   const renderTopActions = () => (
@@ -328,7 +347,7 @@ export function MediaLightbox({
           aria-label="Screenshots"
         >
           {images.map((image, index) => {
-            const isActive = index === active
+            const isActive = index === chromeSlide
             return (
               <button
                 key={image.src}
@@ -340,10 +359,10 @@ export function MediaLightbox({
                 disabled={animating}
                 onClick={() => setActive(index)}
                 className={cn(
-                  "h-2 w-2 origin-center cursor-pointer rounded-full transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.215,0.61,0.355,1)]",
+                  "h-2 w-2 cursor-pointer rounded-full transition-colors duration-300 ease-[cubic-bezier(0.215,0.61,0.355,1)]",
                   isActive
-                    ? "scale-x-[3] bg-foreground"
-                    : "scale-x-100 bg-foreground/25 hover:bg-foreground/45",
+                    ? "bg-foreground"
+                    : "bg-foreground/25 hover:bg-foreground/45",
                 )}
               />
             )
@@ -382,13 +401,13 @@ export function MediaLightbox({
         onClick={requestClose}
       />
 
-      {/* Close / detail link above the image */}
+      {/* Close / detail link above the image — layout stays expanded while fading */}
       <OverlayChrome
         className={cn("fixed z-10", chromeFade(chromeVisible))}
         style={{
-          left: box.left,
+          left: layout.left,
           top: topBarTop,
-          width: box.width,
+          width: layout.width,
           transitionDuration: `${CHROME_MS}ms`,
         }}
       >
@@ -427,48 +446,48 @@ export function MediaLightbox({
             priority
           />
           <p id={titleId} className="sr-only">
-            {current.title ?? current.alt}
+            {chromeCurrent.title ?? chromeCurrent.alt}
           </p>
         </div>
       </div>
 
-      {current.title || current.date || current.description ? (
+      {chromeCurrent.title || chromeCurrent.date || chromeCurrent.description ? (
         <div
           className={cn(
             "fixed z-10 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-8",
             chromeFade(chromeVisible),
           )}
           style={{
-            left: box.left,
-            top: box.top + box.height + 14,
-            width: box.width,
+            left: layout.left,
+            top: layout.top + layout.height + 14,
+            width: layout.width,
             transitionDuration: `${CHROME_MS}ms`,
           }}
         >
-          {current.title || current.date ? (
+          {chromeCurrent.title || chromeCurrent.date ? (
             <div className="sm:text-right">
-              {current.title ? (
+              {chromeCurrent.title ? (
                 <p className="text-[1rem] font-semibold leading-snug tracking-tight text-white">
-                  {current.title}
+                  {chromeCurrent.title}
                 </p>
               ) : null}
-              {current.date ? (
+              {chromeCurrent.date ? (
                 <p
                   className={cn(
                     "text-[0.75rem] font-medium uppercase tracking-wider text-white/65",
-                    current.title && "mt-1",
+                    chromeCurrent.title && "mt-1",
                   )}
                 >
-                  {current.date}
+                  {chromeCurrent.date}
                 </p>
               ) : null}
             </div>
           ) : (
             <span />
           )}
-          {current.description ? (
+          {chromeCurrent.description ? (
             <p className="text-[0.875rem] font-medium leading-relaxed text-white/85">
-              {current.description}
+              {chromeCurrent.description}
             </p>
           ) : null}
         </div>

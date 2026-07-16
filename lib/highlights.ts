@@ -77,7 +77,7 @@ export const highlights: Highlight[] = [
   },
   {
     id: "naqoda-wfh-pandemic",
-    title: "Naqoda WFH in the pandemic",
+    title: "Team Naqoda WFH",
     date: "2021-02-18",
     type: "event",
     description:

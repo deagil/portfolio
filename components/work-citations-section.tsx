@@ -11,7 +11,7 @@ export function WorkCitationsSkeleton() {
         {[0, 1].map((index) => (
           <div
             key={index}
-            className="overflow-hidden rounded-lg border border-border bg-background"
+            className="overflow-hidden rounded-lg border border-border bg-white shadow-sm dark:bg-card dark:shadow-none"
           >
             <div className="aspect-[1200/630] animate-pulse bg-muted" />
             <div className="space-y-2 p-3">

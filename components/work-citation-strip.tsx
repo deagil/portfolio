@@ -67,7 +67,7 @@ function CitationCard({ citation }: { citation: WorkCitationDisplay }) {
       href={citation.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-background transition-colors hover:bg-muted/50"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm transition-colors hover:bg-muted/50 dark:bg-card dark:shadow-none"
     >
       <div className="relative aspect-[1200/630] w-full overflow-hidden bg-muted">
         <CitationImage citation={citation} />
